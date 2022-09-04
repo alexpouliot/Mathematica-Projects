@@ -18,7 +18,7 @@ TDMSProperties::usage = "TDMSProperties[{file,group,channel}] reads properties a
 $TDMSInfo::usage = "All file metadata will be recorded on $TDMSInfo[file] so that it can be accessed between functions in this package. Information is stored as an association with the following format <|''Directory''-><|ContentsDirectory (see TDMSContents)|>,object1adress->object1properties,object2address->object2properties...|>, where object adresses are strings, '/' for the file, '/groupname' for groups and '/groupname/channelname' for channels. objectproperties, lists each property in an association, <|property1->property1value,...|>. This is useful for debugging purposes but normally this information should be accessed through TDMSProperties";
 
 
-debugPrint::usage = "error reports";
+debugPrint::usage = "Hides error reports which can be revealed when debugging";
 
 
 Begin["Private`"];
