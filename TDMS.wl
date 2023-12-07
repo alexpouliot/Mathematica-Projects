@@ -71,7 +71,7 @@ Close[file];
 
 $TDMSInfo[file]["Directory"]
 
-];			
+]			
 
 
 TDMSContents[file_String]:=Module[{metaFile},
@@ -168,10 +168,12 @@ out
 ]
 
 
-(*TDMSProperties[{file,group*,channel*}] reads properties associated with the specified object within the TDMS file.
-If no channel is provided, reads properties of the group, if no channel and group provided, reads properties of 
-the file. This provides a convenient way to access information from the metadata that is not typically used 
-by the user (i.e. Data)(without interacting directly with $TDMSInfo[file]).*)
+(* ::Text:: *)
+(*TDMSProperties[{file,group,channel}] reads properties associated with the specified object within the TDMS file.*)
+(*If no channel is provided, reads properties of the group, if no channel and group provided, reads properties of *)
+(*the file. This provides a convenient way to access information from the metadata that is not typically used *)
+(*by the user without interacting directly with $TDMSInfo[file].*)
+
 
 TDMSProperties[path_List]:=Module[{file,pathString,properties},
 
