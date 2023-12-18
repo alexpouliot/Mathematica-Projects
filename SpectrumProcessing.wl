@@ -21,10 +21,15 @@ the binary data file specified in the directory given";
 
 
 Begin["Private`"];
+Needs["D2Fitting`"];
 
 
 (* ::Section:: *)
 (*Public Functions*)
+
+
+(* ::Subsection:: *)
+(*Import/Export Functions*)
 
 
 importPicoData[filename_]:=Module[{rawDat,timeDat,specDat,powDat,freqDat,
@@ -170,6 +175,34 @@ Close[fileStream];
 
 rawData
 ]
+
+
+(* ::Subsection:: *)
+(*Processing Functions*)
+
+
+cutAndRegularize[powTime_,freqTime_]:=Module[{locs,peakzones,extendPeakzones,peakless,cleanScans,doubleSinModel,fitForPhase},
+
+(*1. cut peaks out of frequency spectrum--------------------------------*)
+
+(*find peaks, assumes 16 peaks here, or 4 scans of 4 D2 dopplers*)
+locs=PeakEstimates[freqTime,60,16];
+
+(*define boundaries of where to cut based on peaks*)
+peakzones=Partition[Sort[locs],4][[All,{1,4}]];
+extendPeakzones=Transpose[{peakzones[[All,1]]-Flatten[Round[0.1Differences[#]]&/@peakzones],
+peakzones[[All,2]]+Flatten[Round[0.1Differences[#]]&/@peakzones]}];
+
+(*remove peaks*)
+peakless=Delete[freqTime,Partition[Flatten[Range[#[[1]],#[[2]]]&/@extendPeakzones],1]];
+(*-----------------------------------------------------------------------*)
+(*2. combine cleaned frequency spectrum with power profile and do a fit to get the phase and amplitude of the current scan*)
+
+cleanScans=Join[powTime/.{x_,y_}->{1,x,y},peakless/.{x_,y_}->{2,x,y}];
+doubleSinModel[set_,a1_,a2_,p_,b1_,b2_,t_,period_]:=Which[set==1,sinWave[1/period,a1,p,t]+b1,set==2,sinWave[1/period,a2,p,t]+b2];
+(*weighted fit to smphasize low amplitude points*)
+
+fitForPhase=NonlinearModelFit[cleanScans,doubleSinModel[set,a1,a2,p,b1,b2,t,avgPeriod],{a1,a2,p,b1,b2},{set,t},Weights->cleanScans[[All,3]]^-2];
 
 
 (* ::Section:: *)

@@ -118,7 +118,7 @@ exConst[A_]:= \[Pi]/(2 \[Epsilon]0 mRb[A] c);(*coefficient in absorbtion exponen
 (*Make lookup table for product of entire exponential coefficient to make functions more efficient*)
 coTab=Table[exConst[A] Ab[A,G]f[A,G,H],{A,{85,87}},{G,Gs[A]},{H,Hs[G]}];
 (*location in table of isotope, ground, excited triplet*)
-levelPart[A_,G_,H_]:=Module[{},
+levelPart[A_,G_,H_]:=Module[{isotopeList,gList,hList,firstD,secondD,thirdD},
 	isotopeList={85,87};
 	gList={{2,3},{1,2}};
 	hList=Range[G-1,G+1];
