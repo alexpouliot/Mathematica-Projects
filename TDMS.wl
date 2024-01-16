@@ -18,6 +18,12 @@ TDMSProperties::usage = "TDMSProperties[{file,group,channel}] reads properties a
 $TDMSInfo::usage = "All file metadata will be recorded on $TDMSInfo[file] so that it can be accessed between functions in this package. Information is stored as an association with the following format <|''Directory''-><|ContentsDirectory (see TDMSContents)|>,object1adress->object1properties,object2address->object2properties...|>, where object adresses are strings, '/' for the file, '/groupname' for groups and '/groupname/channelname' for channels. objectproperties, lists each property in an association, <|property1->property1value,...|>. This is useful for debugging purposes but normally this information should be accessed through TDMSProperties";
 
 
+SetTDMSOptions::usage = "SetTDMSOptions['setting'->value] (or SetTDMSOptions[{setting1->value1,setting2->value2}] will adjust the setting(s) specified";
+
+
+$TDMSOptions::usage = "Saves the adjustable settings for how this packages operates";
+
+
 debugPrint::usage = "Hides error reports which can be revealed when debugging";
 
 
@@ -26,6 +32,7 @@ Begin["Private`"];
 
 (* ::Text:: *)
 (*Known deficienices: String data, interleaved data, DAQmx data, fixedpoint data, unitful data*)
+(*Fix: Reading fragmented files*)
 
 
 (* ::Section:: *)
@@ -71,7 +78,7 @@ Close[file];
 
 $TDMSInfo[file]["Directory"]
 
-]			
+];			
 
 
 TDMSContents[file_String]:=Module[{metaFile},
@@ -108,7 +115,7 @@ $TDMSInfo[file]["Directory"]]
 (*TDMSImport[file,group,channel] imports data from the specified channel within the TDMS file at the specified path.
 Data is only read when this function is called*)
 
-TDMSImport[file_String,group_String,channel_String]:=Module[{len,emptyPaths,findList,groupPath,channelPath,channelInfo,raw,scaled,scaling,timeseries,byteOrder,out},
+TDMSImport[file_String,group_String,channel_String]:=Module[{len,startTime,emptyPaths,findList,groupPath,channelPath,channelInfo,raw,scaled,scaling,timeseries,byteOrder,out},
 
 
 (*Check if the file provided can be opened and is a tdms file*)
@@ -160,7 +167,12 @@ If[AllTrue[{"NI_Scaling_Status","NI_Scale[0]_Linear_Slope","NI_Scale[0]_Linear_Y
 debugPrint[scaled];
 
 If[KeyExistsQ[channelInfo,"wf_increment"],{
-	timeseries=Range[0,(len-1)*channelInfo["wf_increment"],channelInfo["wf_increment"]];
+	If[$TDMSOptions["TimeStamps"]==="Acq. Time",
+		If[KeyExistsQ[channelInfo,"wf_start_time"],
+			startTime=nITime[channelInfo["wf_start_time"]],
+			startTime=0],
+		startTime=0];
+	timeseries=Range[startTime,startTime+(len-1)*channelInfo["wf_increment"],channelInfo["wf_increment"]];
 	out=Transpose[{timeseries,scaled}]},
 	out=scaled];
 Close[file];
@@ -168,12 +180,18 @@ out
 ]
 
 
-(* ::Text:: *)
-(*TDMSProperties[{file,group,channel}] reads properties associated with the specified object within the TDMS file.*)
-(*If no channel is provided, reads properties of the group, if no channel and group provided, reads properties of *)
-(*the file. This provides a convenient way to access information from the metadata that is not typically used *)
-(*by the user without interacting directly with $TDMSInfo[file].*)
+(*default TDMS settings currently the only option is "TimeStamps" and the possible options are
+"Ignore" or "Acq. Time"*)
+$TDMSOptions=<|"TimeStamps"->"Ignore"|>;
 
+
+SetTDMSOptions[options_]:=AssociateTo[$TDMSOptions,options];
+
+
+(*TDMSProperties[{file,group*,channel*}] reads properties associated with the specified object within the TDMS file.
+If no channel is provided, reads properties of the group, if no channel and group provided, reads properties of 
+the file. This provides a convenient way to access information from the metadata that is not typically used 
+by the user (i.e. Data)(without interacting directly with $TDMSInfo[file]).*)
 
 TDMSProperties[path_List]:=Module[{file,pathString,properties},
 
@@ -198,13 +216,17 @@ If[checkForIndex[file],
 pathString=tdmsPathWrite[path[[2;;]]];
 
 (*Check if there is any saved metadata and search it for any relevant entries, if not then try to find it in the file*)
-If[!AssociationQ[$TDMSInfo[file]],
-	$TDMSInfo[file]=Association["Directory"-><||>]];
-If[KeyExistsQ[$TDMSInfo[file],pathString],
-	properties=$TDMSInfo[file][pathString],
-	If[tdmsGrab[file,{pathString}],
-		properties=$TDMSInfo[file][pathString],
-		Return["TDMSProperties: Cannot find requested channel in file"]]];
+If[!AssociationQ[$TDMSInfo[file]],{
+	debugPrint["TDMSProperties: no metadata for this file in memory"];
+	$TDMSInfo[file]=Association["Directory"-><||>]}];
+If[KeyExistsQ[$TDMSInfo[file],pathString],{
+	debugPrint["TDMSProperties: requested metadata is aready in memory!"];
+	properties=$TDMSInfo[file][pathString];},{
+	debugPrint["TDMSProperties: requested metadata not in memory"];
+	If[tdmsGrab[file,{pathString}],{
+		debugPrint["TDMSProperties: found requested metadata in file"];
+		properties=$TDMSInfo[file][pathString]},
+		Return["TDMSProperties: cannot find requested channel in file"]]}];
 Close[file];
 properties
 ]
@@ -536,7 +558,7 @@ writtenPath]
 
 
 (* ::Text:: *)
-(*Functions which skip over irrelevant parts of the metadata and/or selectively apply the read functions above to access the relevant information as quickly ass possible. Employed as the default if property information is unavailable for all functions except TDMSLoad. Skipping data is often only marginally faster than readding it (especially if we can only skip over small segments at a time) so for certain files (large defragmented files with the desired data towards the end of the file) it will be faster to just load all data.*)
+(*Functions which skip over irrelevant parts of the metadata and/or selectively apply the read functions above to access the relevant information as quickly as possible. Employed as the default if property information is unavailable for all functions except TDMSLoad. Skipping data is often only marginally faster than reading it (especially if we can only skip over small segments at a time) so for certain files (large de-fragmented files with the desired data towards the end of the file) it will be faster to just load all data.*)
 
 
 (*takenames: scans through the file and picks out only the group and channel names so that the user can look up
@@ -854,6 +876,9 @@ type==="DAQmx",{
 	debugPrint["typeRead: Cannot handle DAQmx right now"]
 	out=Null}];
 out]
+
+
+nITime[date_DateObject]:=UnixTime[date]+2082830400;
 
 
 (* ::Subsection:: *)
