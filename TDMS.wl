@@ -309,7 +309,7 @@ error]
 advances the stream by 4 bytes*)
 
 
-tdmsTag[file_String]:=BinaryRead[file,Table["Character8",{i,1,4}]]
+tdmsTag[file_String]:=BinaryReadList[file,"Character8",4]
 
 
 (*checkForIndex: checks if a .tdms_index file exists, these are the same as a the tdms file but with all raw data
@@ -490,7 +490,7 @@ path*)
 
 tdmsPathRead[file_String,byteOrder_Integer]:=Module[{pathLength,pathString,pathList},
 pathLength=BinaryRead[file,"UnsignedInteger32",ByteOrdering->byteOrder];
-pathString=StringJoin[BinaryRead[file,Table["Character8",{i,1,pathLength}]]];
+pathString=StringJoin[BinaryReadList[file,"Character8",pathLength]];
 pathList=StringTake[StringSplit[pathString,"/"],{2,-2}];
 pathList]
 
@@ -764,7 +764,7 @@ If[tdmsCheck[file],{
 pathMatch[file_String,paths_List,byteOrder_Integer]:=Module[{pathLength,pathString,matchList,match,matchedPath},
 
 pathLength=BinaryRead[file,"UnsignedInteger32",ByteOrdering->byteOrder];
-pathString=StringJoin[BinaryRead[file,Table["Character8",{i,1,pathLength}]]];
+pathString=StringJoin[BinaryReadList[file,"Character8",pathLength]]];
 
 matchList=(pathString===#)&/@paths;
 match=AnyTrue[matchList,#&];
@@ -848,29 +848,29 @@ the length of the string is always 1 (word). But cant read string data since the
 typeRead[file_String,type_String,length_Integer,byteOrder_Integer]:=Module[{out,stringLength},
 Which[
 type==="Void",
-out=BinaryRead[file,Table["Integer8",{i,1,length}],ByteOrdering->byteOrder],
+out=BinaryReadList[file,"Integer8",length,ByteOrdering->byteOrder],
 
 AnyTrue[{"Integer8","Integer16","Integer32","Integer64","UnsignedInteger8","UnsignedInteger16","UnsignedInteger32","UnsignedInteger64","Real32","Real64","Real128","Complex64","Complex128"},#===type&],
-out=BinaryRead[file,Table[type,{i,1,length}],ByteOrdering->byteOrder],
+out=BinaryReadList[file,type,length,ByteOrdering->byteOrder],
 
 AnyTrue[{"UnitfulReal32","UnitfulReal64","UnitfulReal128"},#===type&],
-out=BinaryRead[file,Table[StringDrop[type,7],{i,1,length}],ByteOrdering->byteOrder],
+out=BinaryReadList[file,StringDrop[type,7],length,ByteOrdering->byteOrder],
 
 type==="String",
 If[length==1,{
 	stringLength=BinaryRead[file,"UnsignedInteger32",ByteOrdering->byteOrder];
-	out=StringJoin[BinaryRead[file,Table["Character8",{i,1,stringLength}]]]},
+	out=StringJoin[BinaryReadList[file,"Character8",stringLength]]},
 	out=stringDataRead[file,byteOrder]],
 
 type==="Boolean",
-	out=(#!=0)&/@BinaryRead[file,Table["Integer8",{i,1,length}]],
+	out=(#!=0)&/@BinaryReadList[file,"Integer8",length],
 
 type==="TimeStamp",{
 	out=Table[FromUnixTime[BinaryRead[file,"UnsignedInteger64",ByteOrdering->byteOrder]*2^-64+BinaryRead[file,"Integer64",ByteOrdering->byteOrder]-2082830400],{i,1,length}]},
 
 type==="FixedPoint",{
 	debugPrint["typeRead: TypeRead reads Fixed Point values as 32 bit integers for now"];
-	out=BinaryRead[file,Table["Integer32",{i,1,length}],ByteOrdering->byteOrder]},
+	out=BinaryReadList[file,"Integer32",length,ByteOrdering->byteOrder]},
 
 type==="DAQmx",{
 	debugPrint["typeRead: Cannot handle DAQmx right now"]
