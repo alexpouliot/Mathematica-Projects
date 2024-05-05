@@ -11,8 +11,9 @@ GaussFWHM::usage = "normalized Gaussian function with FWHM as width parameter va
 Voigt::usage = "approximation to Voigt function with variables (\[Delta],\[Sigma],x), (Lorentzian width, gaussian width, center point) using the Quine paper";
 RbLine::usage = "function for single D2 Rb line, input (isotope, ground F, excited F',pressure (any unit),temperature (K),broadening (Hz/pressure unit), shift (Hz/pressure unit), independant variable (Hz)";
 NatRbLines::usage = " function for all D2 Rb lines, input (no. density of Rb (any isotope),length of cell (m),pressure (any unit), temperature (K),broadening (Hz/pressure unit), shift (Hz/pressure unit), independant variable (Hz)";
+Rb87Lines::usage = "Only the 87 lines";
 NatRbLinesFree::usage = "Function for fitting spectrum to natural Rb sample but with free shift and width parameters"
-NatRbLinesCompiled::usage = "Compiled version";
+(*NatRbLinesCompiled::usage = "Compiled version";*)
 
 
 levelLookup::usage = "get amplitude of Rb line";
@@ -37,8 +38,9 @@ Voigt=With[{n=24,\[Tau]=12},With[{d=N[Range[n] \[Pi]/\[Tau]],b=N[Exp[-(Range[n] 
 RbLine[A_,G_,H_,P_,T_,Br_,Sh_,\[Nu]p_]:=levelLookup[A,G,H]Voigt[(\[CapitalGamma]N[A]+Br P)/2,Sqrt[(kB T)/mRb[A]] \[Nu][A,G,H]/c,\[Nu][85,3,4]+\[Nu]p-\[Nu][A,G,H]-Sh P];
 RbLineFree[A_,G_,H_,T_,\[CapitalGamma]P_,\[Delta]P_,\[Nu]p_]:=levelLookup[A,G,H]Voigt[(\[CapitalGamma]N[A]+\[CapitalGamma]P)/2,Sqrt[(kB T)/mRb[A]] \[Nu][A,G,H]/c,\[Nu][85,3,4]+\[Nu]p-\[Nu][A,G,H]-\[Delta]P];
 NatRbLines[nTot_,len_,P_,T_,Br_,Sh_,\[Nu]p_]:=nTot len Sum[RbLine[A,G,H,P,T,Br,Sh,\[Nu]p],{A,{85,87}},{G,Gs[A]},{H,Hs[G]}];
+Rb87Lines[nTot_,len_,P_,T_,Br_,Sh_,\[Nu]p_]:=nTot/0.278 len Sum[RbLine[87,G,H,P,T,Br,Sh,\[Nu]p],{G,Gs[87]},{H,Hs[G]}];
 NatRbLinesFree[nTot_,len_,T_,\[CapitalGamma]P_,\[Delta]P_,\[Nu]p_]:=nTot len Sum[RbLineFree[A,G,H,T,\[CapitalGamma]P,\[Delta]P,\[Nu]p],{A,{85,87}},{G,Gs[A]},{H,Hs[G]}];
-NatRbLinesCompiled=Compile[{{nTot,_Real},{len,_Real},{P,_Real},{T,_Real},{Br,_Real},{Sh,_Real},{\[Nu]p,_Real}},nTot len Sum[RbLine[A,G,H,P,T,Br,Sh,\[Nu]p],{A,{85,87}},{G,Gs[A]},{H,Hs[G]}]];
+(*NatRbLinesCompiled=Compile[{{nTot,_Real},{len,_Real},{P,_Real},{T,_Real},{Br,_Real},{Sh,_Real},{\[Nu]p,_Real}},nTot len Sum[RbLine[A,G,H,P,T,Br,Sh,\[Nu]p],{A,{85,87}},{G,Gs[A]},{H,Hs[G]}]];*)
 
 
 (* ::Section:: *)

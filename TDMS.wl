@@ -27,6 +27,84 @@ $TDMSOptions::usage = "Saves the adjustable settings for how this packages opera
 debugPrint::usage = "Hides error reports which can be revealed when debugging";
 
 
+tdmsOpen::usage="";
+
+
+alreadyOpen::usage="";
+
+
+tdmsCheck::usage="";
+
+
+tdmsTag::usage="";
+
+
+checkForIndex::usage="";
+
+
+segmentRead::usage="";
+
+
+tdmsToC::usage="";
+
+
+metaRead::usage="";
+
+
+objectRead::usage="";
+
+
+tdmsPathRead::usage="";
+
+
+dataIndex::usage="";
+
+
+propertyRead::usage="";
+
+
+tdmsPathWrite::usage="";
+
+
+takeNames::usage="";
+
+
+dataIndexSkip::usage="";
+
+
+propertySkip::usage="";
+
+
+skipIt::usage="";
+
+
+tdmsGrab::usage="";
+
+
+writeRealPath::usage="";
+
+
+objectFind::usage="";
+
+
+pathMatch::usage="";
+
+
+typeCatalog::usage="";
+
+
+typeSize::usage="";
+
+
+typeRead::usage="";
+
+
+nITime::usage="";
+
+
+tdmsIndex::usage="";
+
+
 Begin["Private`"];
 
 
@@ -67,6 +145,7 @@ $TDMSInfo[file]=Association["Directory"-><||>];
 dataFilePosition=0;
 (*Read metadata*)
 debugPrint[StreamPosition[metaFile]];
+
 While[!tdmsCheck[metaFile],{
 	segmentLength=segmentRead[metaFile,dataFilePosition];
 	dataFilePosition=dataFilePosition+segmentLength+28;
@@ -291,14 +370,15 @@ openStreams=Length[Streams[file]]]
 respectively, returns error status, advances the stream by 4 bytes (due to tdmsTag)*)
 
 
-tdmsCheck[file_String]:=Module[{type,error},
+tdmsCheck[file_String]:=Module[{type,stream,error},
 
 (*Checks for a match with the tag appropriate for .tdms files, or .tdms_index files, depending on the filename*)
 If[StringSplit[file,"_"][[-1]]==="index",
 	type={"T","D","S","h"},
 	type={"T","D","S","m"}];
 
-If[tdmsTag[file]=!=type,{
+stream=Streams[file][[1]];
+If[tdmsTag[stream]=!=type,{
 	debugPrint["tdmsCheck: Stream not located at a beginning of a valid TDSM segment"];
 	error=True;},
 	error=False;];
@@ -309,7 +389,7 @@ error]
 advances the stream by 4 bytes*)
 
 
-tdmsTag[file_String]:=BinaryReadList[file,"Character8",4]
+tdmsTag[stream_InputStream]:=BinaryReadList[stream,"Character8",4]
 
 
 (*checkForIndex: checks if a .tdms_index file exists, these are the same as a the tdms file but with all raw data
@@ -317,11 +397,6 @@ removed and with a different tag at the beginning of each segment*)
 
 
 checkForIndex[file_String]:=FileNames[file<>"_index"]==={file<>"_index"};
-
-
-(*segmentRead: reads the lead-in and metadata of a segment, then skips to the start of the next segment (Does not
-read any data). Advances stream to the start of the next segment eithe by skipping the data (.tdms file)
-or reading to the end of the metadata (.tdms_index file)*)
 
 
 (* ::Subsection:: *)
@@ -332,15 +407,19 @@ or reading to the end of the metadata (.tdms_index file)*)
 (*Functions involved in reading organizational information and data properties of the file. Organized (as best as possible) as if they were going to be used to read the metadata continuously from start to finish, as they would be deployed using TDMSLoad. These functions are used selectively if we are trying to skip portions of the metadata to find specific information more quickly (the default for TDMSImport, TDMSPropertis and TDMSContents).*)
 
 
+(*segmentRead: reads the lead-in and metadata of a segment, then skips to the start of the next segment (Does not
+read any data). Advances stream to the start of the next segment eithe by skipping the data (.tdms file)
+or reading to the end of the metadata (.tdms_index file)*)
+
+
 segmentRead[file_String,segmentLocation_Integer]:=Module[{segmentProperties,byteOrder,segmentLength,dataOffset},
-debugPrint["in"];
 
 (*Read table of contents (ToC), these properties will apply to all channels in the segment 
 (ToC always little-endian, which is helpful since ToC specifiec endian-ness of the rest of the data)
 advances the stream 4 bytes*)
 segmentProperties=tdmsToC[file];
 
-(*Abort if DAQmx encounteres*)
+(*Abort if DAQmx encountered*)
 If[segmentProperties["DAQmx"],Abort[];]
 
 (*set byte order to correctly read all numeric values in this segment*)
@@ -372,6 +451,7 @@ If[StringSplit[file,"_"][[-1]]=!="index",
 SetStreamPosition[file,segmentLocation+segmentLength+28]]
 (*debugPrint[StreamPosition[file]];*)
 (*if this is an index file then we should already be at the start of the next segment*)
+(*return segment legnth*)
 segmentLength
 ]
 
@@ -490,7 +570,7 @@ path*)
 
 tdmsPathRead[file_String,byteOrder_Integer]:=Module[{pathLength,pathString,pathList},
 pathLength=BinaryRead[file,"UnsignedInteger32",ByteOrdering->byteOrder];
-pathString=StringJoin[BinaryReadList[file,"Character8",pathLength]];
+pathString=StringJoin[BinaryReadList[Streams[file][[1]],"Character8",pathLength]];
 pathList=StringTake[StringSplit[pathString,"/"],{2,-2}];
 pathList]
 
@@ -764,7 +844,7 @@ If[tdmsCheck[file],{
 pathMatch[file_String,paths_List,byteOrder_Integer]:=Module[{pathLength,pathString,matchList,match,matchedPath},
 
 pathLength=BinaryRead[file,"UnsignedInteger32",ByteOrdering->byteOrder];
-pathString=StringJoin[BinaryReadList[file,"Character8",pathLength]]];
+pathString=StringJoin[BinaryReadList[Streams[file][[1]],"Character8",pathLength]];
 
 matchList=(pathString===#)&/@paths;
 match=AnyTrue[matchList,#&];
@@ -848,29 +928,29 @@ the length of the string is always 1 (word). But cant read string data since the
 typeRead[file_String,type_String,length_Integer,byteOrder_Integer]:=Module[{out,stringLength},
 Which[
 type==="Void",
-out=BinaryReadList[file,"Integer8",length,ByteOrdering->byteOrder],
+out=BinaryReadList[Streams[file][[1]],"Integer8",length,ByteOrdering->byteOrder],
 
 AnyTrue[{"Integer8","Integer16","Integer32","Integer64","UnsignedInteger8","UnsignedInteger16","UnsignedInteger32","UnsignedInteger64","Real32","Real64","Real128","Complex64","Complex128"},#===type&],
-out=BinaryReadList[file,type,length,ByteOrdering->byteOrder],
+out=BinaryReadList[Streams[file][[1]],type,length,ByteOrdering->byteOrder],
 
 AnyTrue[{"UnitfulReal32","UnitfulReal64","UnitfulReal128"},#===type&],
-out=BinaryReadList[file,StringDrop[type,7],length,ByteOrdering->byteOrder],
+out=BinaryReadList[Streams[file][[1]],StringDrop[type,7],length,ByteOrdering->byteOrder],
 
 type==="String",
 If[length==1,{
 	stringLength=BinaryRead[file,"UnsignedInteger32",ByteOrdering->byteOrder];
-	out=StringJoin[BinaryReadList[file,"Character8",stringLength]]},
+	out=StringJoin[BinaryReadList[Streams[file][[1]],"Character8",stringLength]]},
 	out=stringDataRead[file,byteOrder]],
 
 type==="Boolean",
-	out=(#!=0)&/@BinaryReadList[file,"Integer8",length],
+	out=(#!=0)&/@BinaryReadList[Streams[file][[1]],"Integer8",length],
 
 type==="TimeStamp",{
 	out=Table[FromUnixTime[BinaryRead[file,"UnsignedInteger64",ByteOrdering->byteOrder]*2^-64+BinaryRead[file,"Integer64",ByteOrdering->byteOrder]-2082830400],{i,1,length}]},
 
 type==="FixedPoint",{
 	debugPrint["typeRead: TypeRead reads Fixed Point values as 32 bit integers for now"];
-	out=BinaryReadList[file,"Integer32",length,ByteOrdering->byteOrder]},
+	out=BinaryReadList[Streams[file][[1]],"Integer32",length,ByteOrdering->byteOrder]},
 
 type==="DAQmx",{
 	debugPrint["typeRead: Cannot handle DAQmx right now"]
@@ -881,7 +961,7 @@ out]
 nITime[date_DateObject]:=UnixTime[date]+2082830400;
 
 
-(* ::Subsection:: *)
+(* ::Subsection::Closed:: *)
 (*Obsolete functions*)
 
 
